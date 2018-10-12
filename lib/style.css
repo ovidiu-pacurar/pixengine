@@ -1,0 +1,14 @@
+.container {
+    background: aqua;
+    margin: auto;
+}
+
+#material_box {
+    width: 40px;
+    height: 500px;
+    float: left;
+}
+
+#viewport {
+    background: black;
+}
