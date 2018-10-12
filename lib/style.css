@@ -9,6 +9,18 @@
     float: left;
 }
 
+#toolbox {
+	padding-left:40px;
+}
+
+#material_box .selected{
+	border: black 1px solid;
+}
+
+#toolbox .selected{
+	border: black 1px solid;
+}
+
 #viewport {
     background: black;
 }
