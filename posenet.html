@@ -1,0 +1,121 @@
+<html>
+  <body>
+	<div style="position: relative;">
+	<img id="inputImage" crossorigin="anonymous" src="" style="visibility: visible;" />
+	<canvas id="outputCanvas" width="352" height="288" style="position: absolute; top:0; left:0;" />
+	</div>
+    <script src="https://unpkg.com/@tensorflow/tfjs"></script>    
+    <script src="https://unpkg.com/@tensorflow-models/posenet">
+    </script>
+    <script type="text/javascript">
+		const inputImage = document.getElementById('inputImage');
+		const imageUrl = 'http://192.168.43.1:8080/shot.jpg?rnd=';
+		const moveUrl = 'http://192.168.43.33/motor?';
+		const moveSocketUrl = 'ws://192.168.43.33:81'
+		const outputCanvas = document.getElementById('outputCanvas');	
+		const ctx = outputCanvas.getContext('2d');
+		const DoublePi = 2*Math.PI;
+		const width = outputCanvas.width;
+		const height = outputCanvas.height;
+		const moveSocket = new WebSocket(moveSocketUrl);
+		var model;
+		
+		
+		
+		function refresh(){
+			inputImage.src = imageUrl+ (new Date()).getTime();
+		}
+		function queueRefresh(){
+			setTimeout(refresh, 0);
+		}
+		async function processFrame(){
+			const imageScaleFactor = 0.5;
+			const flipHorizontal = false;
+			const outputStride = 16;
+			const maximumPoses = 5;
+			const poseScoreTreshold = 0.5;
+			const nmsRadius = 20;				
+			const poses = await model.estimateMultiplePoses(inputImage, imageScaleFactor, flipHorizontal, outputStride, maximumPoses, poseScoreTreshold, nmsRadius);			
+			
+			var target = drawPoses(poses);
+			var deadBandX = width/6;
+			if(target){				
+				if(target.x < (width/2 - deadBandX/2)){
+					turnLeft(queueRefresh);
+				}
+				if(target.x > (width/2 + deadBandX/2)){
+					turnRight(queueRefresh);
+				}
+				
+				if(Math.abs(target.x - width/2) <= deadBandX/2){
+					moveStop(queueRefresh);
+				}
+			}else {
+				moveStop(queueRefresh);
+			}
+		}
+		
+		function drawPoses(poses){
+			ctx.clearRect(0, 0, outputCanvas.width, outputCanvas.height);
+			ctx.strokeStyle="red";		
+			var target = null;
+			poses.forEach( pose => {
+				if(pose.score >= 0.3){
+					ctx.beginPath();
+					pose.keypoints.forEach( point =>{
+						if(point.score >=0.1){
+							
+						}
+						if(point.part == 'nose' || point.part =='leftEye' || point.part =='rightEye'){
+							ctx.moveTo(point.position.x+10, point.position.y);
+							ctx.arc(point.position.x, point.position.y,10,0, DoublePi, false);
+						}
+						if(point.part == 'nose' && !target){
+							target = point.position;
+						}
+					});
+					ctx.stroke();
+				}
+			});
+			if(target){
+				ctx.strokeStyle ='orange';
+				ctx.beginPath();
+				ctx.moveTo(target.x+50, target.y);
+				ctx.arc(target.x, target.y,50,0, DoublePi, false);
+				ctx.stroke();
+			}
+			return target;
+		}
+		
+		function turnLeft(callback){
+			moveSend('speed0=-3&speed1=3&onTime=2000&offTime=0', callback);			
+		}
+		
+		function turnRight(callback){
+			moveSend('speed0=3&speed1=-3&onTime=2000&offTime=0', callback);						
+		}
+		
+		function moveStop(callback){
+			moveSend('speed0=0&speed1=0&onTime=2000&offTime=0', callback);						
+		}
+		
+		function moveSend(params, callback){
+			moveSocket.send(params);
+			if(callback)callback();
+			/*var xhttp = new XMLHttpRequest();    			  
+			xhttp.open('GET', moveUrl+params, true);     
+			xhttp.onload = callback;
+			xhttp.onerror = callback;
+			xhttp.send();  			*/
+		}
+		
+		inputImage.addEventListener('load', processFrame);
+		outputCanvas.addEventListener('click', moveStop);
+		
+      posenet.load().then(async function(net) {
+		model = net;        
+		refresh();
+      });
+    </script>
+  </body>
+</html>
